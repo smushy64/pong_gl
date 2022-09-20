@@ -2,10 +2,14 @@
 
 Pong written in C++ using the Windows API and OpenGL.
 
-![Windowed Screenshot](screenshots/scr_0.jpg)
-
 ## Installation
 
 Download the latest release [here.](builds/)
 
 Unzip and run PongGL.exe
+
+## Screenshots
+
+![Main Menu Screenshot](screenshots/scr_main_menu.jpg)
+
+![In Game Screenshot](screenshots/scr_game.jpg)
