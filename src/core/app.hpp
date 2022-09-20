@@ -3,6 +3,11 @@
 
 #define Timestep f32
 
+enum AppState {
+    START,
+    GAME,
+};
+
 struct Paddle { f32 y; };
 struct Ball   { f32 x; f32 y; f32 dx; f32 dy; };
 struct GameState {
@@ -17,6 +22,7 @@ struct GameState {
 struct PlayerInput {
     bool up;
     bool down;
+    bool enter;
 };
 
 const f32 DELAY_BETWEEN_ROUNDS = 5.0f;
@@ -26,6 +32,8 @@ public:
     Pong();
     void Update( Timestep, const PlayerInput& );
     const GameState& GetState() { return m_gameState; }
+    AppState GetAppState() { return m_state; }
+    u32 SelectedMenuOption() { return m_selectedOption; }
 private:
     GameState m_gameState;
     static f32 MovePaddle(const f32&, const f32&);
@@ -36,5 +44,10 @@ private:
     void BallCollision();
     void ResetBall();
 
+    AppState m_state;
+    u32 m_selectedOption = 0;
+
     f32 m_scoreTimer = 0.0f;
+    bool m_lastUp   = false;
+    bool m_lastDown = false;
 };

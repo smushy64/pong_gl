@@ -4,27 +4,58 @@
 #include <stdlib.h>
 
 Pong::Pong() {
+    m_state = AppState::START;
     m_gameState = {};
     m_gameState.scored  = true;
     m_gameState.ball.dx = -1.0f;
 }
 
 void Pong::Update( Timestep ts, const PlayerInput& input ) {
-    if( !m_gameState.scored ) {
-        MoveBallX(m_gameState.ball.dx * ts * BALL_SPEED);
-        MoveBallY(m_gameState.ball.dy * ts * BALL_SPEED);
-        BallCollision();
-    } else {
-        m_scoreTimer += ts;
-        if(m_scoreTimer >= DELAY_BETWEEN_ROUNDS) {
-            m_scoreTimer = 0.0f;
-            m_gameState.scored = false;
-            ResetBall();
-        }
-    }
+    switch(m_state) {
+        case AppState::START:{
+            if(input.enter) {
+                switch(m_selectedOption) {
+                    case START_GAME_OPTION: {
+                        m_state = AppState::GAME;
+                    } return;
+                    case QUIT_GAME_OPTION: {
+                        g_RUNNING = false;
+                    } return;
+                }
+            }
+            if(input.up != m_lastUp && input.up) {
+                if(m_selectedOption > 0) {
+                    m_selectedOption -= 1;
+                } else {
+                    m_selectedOption = MAX_MENU_OPTIONS - 1;
+                }
+            } else if(input.down != m_lastDown && input.down) {
+                m_selectedOption += 1;
+                if(m_selectedOption == MAX_MENU_OPTIONS) {
+                    m_selectedOption = 0;
+                }
+            }
+            m_lastUp   = input.up;
+            m_lastDown = input.down;
+        }break;
+        case AppState::GAME:{
+            if( !m_gameState.scored ) {
+                MoveBallX(m_gameState.ball.dx * ts * BALL_SPEED);
+                MoveBallY(m_gameState.ball.dy * ts * BALL_SPEED);
+                BallCollision();
+            } else {
+                m_scoreTimer += ts;
+                if(m_scoreTimer >= DELAY_BETWEEN_ROUNDS) {
+                    m_scoreTimer = 0.0f;
+                    m_gameState.scored = false;
+                    ResetBall();
+                }
+            }
 
-    m_gameState.player.y = MovePaddle( m_gameState.player.y, PADDLE_SPEED * PlayerDY(input) * ts );
-    m_gameState.cpu.y    = MovePaddle( m_gameState.cpu.y,    CpuDY() * ts );
+            m_gameState.player.y = MovePaddle( m_gameState.player.y, PADDLE_SPEED * PlayerDY(input) * ts );
+            m_gameState.cpu.y    = MovePaddle( m_gameState.cpu.y,    CpuDY() * ts );
+        }break;
+    }
 }
 
 void Pong::BallCollision() {

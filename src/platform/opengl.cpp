@@ -42,15 +42,30 @@ void OpenGLRenderer::RenderGame(const GameState& state) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 }
 
-void OpenGLRenderer::RenderScore(u32 playerScore, u32 cpuScore) {
-    f32 textSize = 2.0f;
-    f32 textX = 200.0f;
-    f32 textY = SCREEN_H - 125.0f;
-    RenderText(std::to_string(playerScore), textX, textY, textSize, false);
-    RenderText(std::to_string(cpuScore), SCREEN_W - textX, textY, textSize, true);
+void OpenGLRenderer::RenderMenu(u32 selectedOption) {
+    glm::vec3 startColor = glm::vec3(0.5f);
+    glm::vec3 quitColor  = glm::vec3(0.5f);
+    switch(selectedOption) {
+        case START_GAME_OPTION: {
+            startColor = glm::vec3(1.0f);
+        } break;
+        case QUIT_GAME_OPTION: {
+            quitColor = glm::vec3(1.0f);
+        } break;
+    }
+    RenderText("PongGL", (SCREEN_W / 2.0f) - 150.0f, (SCREEN_H / 2.0f) + (SCREEN_H / 4.0f), TEXT_SCALE, false, glm::vec3(1.0f));
+    RenderText("Start Game", (SCREEN_W / 2.0f) - 250.0f, SCREEN_H / 2.0f,  TEXT_SCALE * 0.9f, false, startColor);
+    RenderText("Quit  Game", (SCREEN_W / 2.0f) - 250.0f, SCREEN_H / 3.0f, TEXT_SCALE * 0.9f, false, quitColor);
 }
 
-void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, bool reverse) {
+void OpenGLRenderer::RenderScore(u32 playerScore, u32 cpuScore) {
+    f32 textX = 200.0f;
+    f32 textY = SCREEN_H - 125.0f;
+    RenderText(std::to_string(playerScore), textX, textY, TEXT_SCALE, false, glm::vec3(1.0f));
+    RenderText(std::to_string(cpuScore), SCREEN_W - textX, textY, TEXT_SCALE, true, glm::vec3(1.0f));
+}
+
+void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, bool reverse, const glm::vec3& color) {
     if(!m_fontLoaded) {
         std::cout << "ERROR: FONT NOT LOADED!" << std::endl;
         return;
@@ -59,6 +74,8 @@ void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, bool 
     glUseProgram(m_fontShader);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glUniform3fv(m_fontColorLoc, 1, glm::value_ptr(color));
 
     glActiveTexture(GL_TEXTURE0);
 
@@ -312,10 +329,11 @@ in vec2 v2f_uv;
 out vec4 FRAG_COLOR;
 
 uniform sampler2D u_glyph;
+uniform vec3 u_textColor;
 
 void main() {
     float result = texture(u_glyph, v2f_uv).r;
-    FRAG_COLOR = vec4( 1.0, 1.0, 1.0, result );
+    FRAG_COLOR = vec4( u_textColor.rgb, result );
 }
 )";
 
@@ -371,6 +389,8 @@ void main() {
 
     GLint fontSamplerLoc = glGetUniformLocation(m_fontShader, "u_glyph");
     glUniform1i(fontSamplerLoc, 0);
+
+    m_fontColorLoc = glGetUniformLocation(m_fontShader, "u_textColor");
 
     glGenVertexArrays(1, &m_fontVao);
     glBindVertexArray(m_fontVao);

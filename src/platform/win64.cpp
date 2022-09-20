@@ -12,7 +12,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
     Window window = Window(hInst);
     if( !window.Success() ) { return -1; }
 
-    Pong asteroids = Pong();
+    Pong pong = Pong();
     PlayerInput input = {};
 
     if(!window.CreateGLContext()) { return -1; }
@@ -21,10 +21,17 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
     while(g_RUNNING) {
         window.ProcessMessages(input);
-        asteroids.Update(1.0f / 60.0f, input);
+        pong.Update(1.0f / 60.0f, input);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);{
-            renderer.RenderGame(asteroids.GetState());
+            switch(pong.GetAppState()) {
+                case AppState::START: {
+                    renderer.RenderMenu(pong.SelectedMenuOption());
+                } break;
+                case AppState::GAME: {
+                    renderer.RenderGame(pong.GetState());
+                } break;
+            }
         } window.GLSwapBuffers();
     }
 
@@ -48,10 +55,12 @@ void Window::ProcessMessages(PlayerInput& input) {
         case WM_KEYDOWN: {
             if( message.wParam == VK_DOWN    || message.wParam == 'S' )  { input.down = true; }
             else if( message.wParam == VK_UP || message.wParam == 'W' ) { input.up = true; }
+            else if( message.wParam == VK_RETURN ) { input.enter = true; }
         } break;
         case WM_KEYUP: {
             if( message.wParam == VK_DOWN    || message.wParam == 'S' )  { input.down = false; }
             else if( message.wParam == VK_UP || message.wParam == 'W' ) { input.up = false; }
+            else if( message.wParam == VK_RETURN ) { input.enter = false; }
         } break;
         default: {
             TranslateMessage(&message);
