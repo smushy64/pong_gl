@@ -1,10 +1,17 @@
 # Desired compiler and C++ version
-CC = g++ -std=c++20
+CC = g++ -std=c++17
 # Change between DEBUG/RELEASE
 # Change target path as well
-CFLAGS = $(DEBUG)
+# remove -mwindows for debug builds
+CFLAGS    = $(DEBUG)
+LNKFLAGS  = #-mwindows
 TARGETDIR = ./bin/debug
 
+# Dependencies
+# - freetype
+
+# Mingw include path
+MINGWINC = C:/msys64/mingw64/include
 
 # DONOT EDIT BEYOND THIS POINT!!! ===============================================
 
@@ -24,8 +31,8 @@ DEF      = -D UNICODE -D WINDOWS
 DFLAGS   = $(WARN) $(DEF) $(OPT) -D DEBUG
 RFLAGS   = $(DEF) -O2
 DEPFLAGS = -MP -MD
-INC      = ./src C:/msys64/mingw64/include
-LNK      = -lmingw32 -lopengl32 -lgdi32 -lfreetype
+INC      = ./src $(MINGWINC)
+LNK      = -static-libstdc++ -static-libgcc -lmingw32 -lopengl32 -lgdi32
 
 CPP      = $(foreach D, $(DIR), $(wildcard $(D)/*.cpp))
 C        = $(foreach D, ./src, $(wildcard $(D)/*.c))
@@ -39,7 +46,7 @@ run: all copy rm_nul
 
 -include $(DEPS)
 $(BINARY): $(OBJ)
-	$(CC) -o $@ $(LIB) $^ $(LNK)
+	$(CC) -o $@ $(LIB) $^ $(LNK) $(LNKFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -59,4 +66,4 @@ cleano:
 clean: cleano
 	-@rm $(BINARY); rm -r $(TARGETDIR)/resources
 
-.PHONY: all clean cleano
+.PHONY: run all clean cleano

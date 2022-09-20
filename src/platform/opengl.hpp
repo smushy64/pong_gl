@@ -1,5 +1,6 @@
 #pragma once
 #include "./core/app.hpp"
+#include "./core/font.hpp"
 #include <glm/mat4x4.hpp>
 #include <map>
 #include <string>
@@ -7,7 +8,8 @@
 struct Character {
     u32 texture;
     i32 w; i32 h;
-    i32 bearing_x; i32 bearing_y;
+    i32 bearing_x;
+    i32 bearing_y;
     u32 advance;
 };
 
@@ -22,7 +24,7 @@ public:
     void RenderMenu(MenuOption);
     void RenderControls();
     void RenderGame(const GameState&);
-    void LoadFont();
+    void LoadFont(const Font&);
     void RenderText(std::string, f32, f32, f32, TextStyle, const glm::vec3&);
     void RenderScore(u32,u32);
     void ClearScreen();

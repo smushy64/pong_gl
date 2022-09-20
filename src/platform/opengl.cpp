@@ -3,13 +3,9 @@
 #include "globals.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include "./core/font.hpp"
 
 #include <iostream>
-
-const char* FONT = "./resources/HyperspaceBold.otf";
 
 void OpenGLRenderer::ClearScreen() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -83,8 +79,16 @@ void OpenGLRenderer::RenderMenu(MenuOption selectedOption) {
 }
 
 void OpenGLRenderer::RenderControls() {
-    RenderText( "Move Cursor [Arrow Up, Arrow Down, W, S] | Confirm [Enter, Space] | Exit [Escape]",
-        10.0f, 10.0f, TEXT_SCALE * 0.2f, TextStyle::NORMAL, glm::vec3(1.0f)
+    f32 scale = 0.3f;
+    f32 vSpacing = 30.0f;
+    RenderText( "Move Cursor [ Arrow Up | Arrow Down | W | S ]",
+        10.0f, SCREEN_H - ( 10.0f + (vSpacing * 2.0f) ), TEXT_SCALE * scale, TextStyle::NORMAL, glm::vec3(1.0f)
+    );
+    RenderText( "Confirm     [ Enter | Space ]",
+        10.0f, SCREEN_H - ( 10.0f + vSpacing ), TEXT_SCALE * scale, TextStyle::NORMAL, glm::vec3(1.0f)
+    );
+    RenderText( "Exit        [ Escape ]",
+        10.0f, SCREEN_H - 10.0f, TEXT_SCALE * scale, TextStyle::NORMAL, glm::vec3(1.0f)
     );
 }
 
@@ -158,60 +162,34 @@ void OpenGLRenderer::RenderCharacter(const Character& character, f32 x, f32 y, f
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-void OpenGLRenderer::LoadFont() {
-    FT_Library ft;
-    if(FT_Init_FreeType(&ft)) {
-        std::cout << "FAILED TO INIT FREETYPE!" << std::endl;
-        return;
-    }
-
-    FT_Face face;
-    if(FT_New_Face(ft, FONT, 0, &face)) {
-        std::cout << "FAILED TO LOAD FONT!" << std::endl;
-        return;
-    }
-    FT_Set_Pixel_Sizes(face, 0, 48);
-    
+void OpenGLRenderer::LoadFont(const Font& font) {    
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
-    for( unsigned char c = 0; c < 128; c++ ) {
-        if( FT_Load_Char(face, c, FT_LOAD_RENDER) ) {
-            std::cout << "FAILED TO LOAD \"" << c << "\"!" << std::endl;
-            continue;
-        }
-
+    for( u8 c = 0; c < 128; c++ ) {
+        Glyph glyph = font.glyphs.at(c);
         Character character = {};
-
-        u32 width  = face->glyph->bitmap.width;
-        u32 height = face->glyph->bitmap.rows;
-
         glGenTextures(1, &character.texture);
         glBindTexture(GL_TEXTURE_2D, character.texture);
         glTexImage2D(
             GL_TEXTURE_2D, 0,
             GL_RED,
-            width,
-            height,
+            glyph.width,
+            glyph.height,
             0, GL_RED, GL_UNSIGNED_BYTE,
-            face->glyph->bitmap.buffer
+            glyph.bitmap
         );
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        character.w         = glyph.width;
+        character.h         = glyph.height;
+        character.bearing_x = 0;
+        character.bearing_y = 0;
+        character.advance   = glyph.advanceWidth + 400;
 
-        character.w         = width;
-        character.h         = height;
-        character.bearing_x = face->glyph->bitmap_left;
-        character.bearing_y = face->glyph->bitmap_top;
-        character.advance   = face->glyph->advance.x;
-
-        m_characters.insert(std::pair<char, Character>(c, character));
+        m_characters.insert(std::pair<char, Character>( (char)c, character ));
     }
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    FT_Done_Face(face);
-    FT_Done_FreeType(ft);
-
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     m_fontLoaded = true;
 }
 
@@ -343,8 +321,6 @@ void main() {
     );
 
     m_transformLoc = glGetUniformLocation(m_shader, "u_transform");
-
-    LoadFont();
 
     const char* font_vert_src = R"(
 #version 460 core

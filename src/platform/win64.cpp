@@ -3,10 +3,14 @@
 #include "opengl.hpp"
 #include <functional>
 #include "glad/glad.h"
+#include "./core/font.hpp"
 
 #include <iostream>
 
-u64 GetTicks();
+f64 perfFrequency;
+i64 perfCounterStart;
+
+const char* FONT_PATH = "./resources/HyperspaceBold.otf";
 
 int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
 
@@ -26,14 +30,39 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
     OpenGLRenderer renderer = OpenGLRenderer();
 
-    f32 lastElapsedTime = 0.0;
+    ReadResult fontFile = ReadEntireFile(FONT_PATH);
+    if(fontFile.contents) {
+        // load font
+        Font font = LoadFontFromBytes( fontFile.size, (u8*)fontFile.contents );
+        FreeFileMemory(fontFile.contents);
+        // load into renderer
+        renderer.LoadFont(font);
+        FreeFont(font);
+    }
 
+    // while(g_RUNNING) {
+    //     window.ProcessMessages(input);
+
+    //     renderer.ClearScreen();
+    //     renderer.RenderText(
+    //         "Hello World",
+    //         0.0f,
+    //         SCREEN_H / 2.0f,
+    //         ElapsedTime(),
+    //         TextStyle::NORMAL,
+    //         glm::vec3(1.0f)
+    //     );
+    //     window.GLSwapBuffers();
+    // }
+    // return 0;
+
+    f32 lastElapsedTime = 0.0;
     while(g_RUNNING) {
         window.ProcessMessages(input);
 
-        f32 elapsedTime = window.ElapsedTime();
-        DeltaTime deltaTime   = elapsedTime - lastElapsedTime;
-        lastElapsedTime = elapsedTime;
+        f32 elapsedTime     = ElapsedTime();
+        DeltaTime deltaTime = elapsedTime - lastElapsedTime;
+        lastElapsedTime     = elapsedTime;
 
         pong.Update(deltaTime, input);
 
@@ -53,13 +82,13 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
 }
 
-f64 Window::ElapsedTime() {
+f64 ElapsedTime() {
     LARGE_INTEGER lpPerformanceCount;
     if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) {
         g_RUNNING = false;
         return 0.0;
     }
-    return double( lpPerformanceCount.QuadPart - m_counterStart )/m_frequency;
+    return double( lpPerformanceCount.QuadPart - perfCounterStart )/perfFrequency;
 }
 
 void Window::GLSwapBuffers() {
@@ -115,7 +144,7 @@ Window::Window(HINSTANCE hInst) {
 
     if( RegisterClassEx( &window_class ) == FALSE ) { m_success = false; return; }
 
-    RECT window_rect = {};
+    RECT window_rect   = {};
     window_rect.left   = 0;
     window_rect.top    = 0;
     window_rect.right  = 1280;
@@ -143,12 +172,12 @@ Window::Window(HINSTANCE hInst) {
     LARGE_INTEGER lpFrequency;
     if(QueryPerformanceFrequency(&lpFrequency) == FALSE) { m_success = false; return; }
 
-    m_frequency = double( lpFrequency.QuadPart );
+    perfFrequency = double( lpFrequency.QuadPart );
 
     LARGE_INTEGER lpPerformanceCount;
     if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) { m_success = false; return; }
 
-    m_counterStart = lpPerformanceCount.QuadPart;
+    perfCounterStart = lpPerformanceCount.QuadPart;
 }
 
 typedef HGLRC (*wglCreateContextAttribsARBptr) (HDC, HGLRC, const i32* );
@@ -233,4 +262,48 @@ Window::~Window() {
         wglDeleteContext( m_hglrc );
     }
     ReleaseDC(m_hWnd, m_hdc);
+}
+
+ReadResult ReadEntireFile(const char* filename) {
+
+    ReadResult result = {};
+    result.contents = nullptr;
+    result.size     = 0;
+
+    HANDLE fileHandle = CreateFileA(
+        filename,
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        0, 0
+    );
+
+    if(fileHandle != INVALID_HANDLE_VALUE) {
+        LARGE_INTEGER fileSize;
+        if( GetFileSizeEx( fileHandle, &fileSize ) == TRUE ) {
+            result.size = (u32)fileSize.QuadPart;
+            result.contents = VirtualAlloc( 0, result.size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE );
+
+            if(result.contents) {
+                DWORD bytesRead;
+                if( !(ReadFile(
+                    fileHandle, result.contents,
+                    result.size,
+                    &bytesRead, NULL
+                ) && bytesRead == result.size )) {
+                    FreeFileMemory(result.contents);
+                    result.contents = nullptr;
+                }
+            }
+        }
+
+        CloseHandle( fileHandle );
+    }
+
+    return result;
+}
+
+void FreeFileMemory(void* fileMemory) {
+    VirtualFree( fileMemory, 0, MEM_RELEASE );
 }
