@@ -1,48 +1,62 @@
-CC = g++ -std=c++17
+# Desired compiler and C++ version
+CC = g++ -std=c++20
+# Change between DEBUG/RELEASE
+# Change target path as well
+CFLAGS = $(DEBUG)
+TARGETDIR = ./bin/debug
 
-build: copy_resources rm_null
-	$(CC) $(debug_flags) $(src) -o $(bin)/debug/$(exe) $(def) -D DEBUG $(lnk) -I $(minc) $(inc)
 
-build_r: copy_resources_r rm_null
-	$(CC) $(release_flags) $(src) -o $(bin)/release/$(exe) $(def) $(lnk) -I $(minc) $(inc) $(release_linker_flags)
+# DONOT EDIT BEYOND THIS POINT!!! ===============================================
 
-run:
-	$(bin)/debug/$(exe)
+DEBUG   = $(DFLAGS) $(foreach D, $(INC), -I$(D)) $(DEPFLAGS)
+RELEASE = $(RFLAGS) $(foreach D, $(INC), -I$(D)) $(DEPFLAGS)
 
-run_r:
-	$(bin)/release/$(exe)
+BINARY = $(TARGETDIR)/$(EXE)
+EXE = PongGL.exe
 
-clean:
-	rm -r -f $(bin)/debug/*
+RES = ./resources
+DIR = ./src ./src/platform ./src/core
+OBJDIR = /bin/obj
 
-clean_r:
-	rm -r -f $(bin)/release/*
+WARN     = -Wall
+OPT      = -O0 -g
+DEF      = -D UNICODE -D WINDOWS
+DFLAGS   = $(WARN) $(DEF) $(OPT) -D DEBUG
+RFLAGS   = $(DEF) -O2
+DEPFLAGS = -MP -MD
+INC      = ./src C:/msys64/mingw64/include
+LNK      = -lmingw32 -lopengl32 -lgdi32 -lfreetype
 
-copy_resources:
-	-@robocopy $(res) $(bin)/debug/resources/ > nul
+CPP      = $(foreach D, $(DIR), $(wildcard $(D)/*.cpp))
+C        = $(foreach D, ./src, $(wildcard $(D)/*.c))
+OBJ      = $(patsubst %.c,%.o, $(C)) $(patsubst %.cpp,%.o, $(CPP))
+DEPS     = $(patsubst %.c,%.d,$(C)) $(patsubst %.cpp,%.d,$(CPP))
 
-copy_resources_r:
-	-@robocopy $(res) $(bin)/release/resources/ > nul
+all: $(BINARY)
 
-rm_null:
-	rm ./nul
+run: all copy rm_nul
+	$(BINARY)
 
-res = ./resources
+-include $(DEPS)
+$(BINARY): $(OBJ)
+	$(CC) -o $@ $(LIB) $^ $(LNK)
 
-exe = PongGL.exe
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-def = -D WINDOWS -D UNICODE
+%.o: %.cpp
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-src = ./src/*.cpp ./src/*.c ./src/platform/*.cpp ./src/core/*.cpp
-inc = -I ./src/
+copy:
+	-@robocopy $(RES) $(TARGETDIR)/resources/ > nul
 
-bin = ./bin
+rm_nul:
+	-@rm nul
 
-debug_flags = -Wall -O0
-release_flags = -O2
+cleano:
+	-@rm $(OBJ) $(DEPS)
 
-minc = C:/msys64/mingw64/include
+clean: cleano
+	-@rm $(BINARY); rm -r $(TARGETDIR)/resources
 
-lnk = -lmingw32 -lopengl32 -lgdi32 -lfreetype
-
-release_linker_flags = -mwindows
+.PHONY: all clean cleano
