@@ -13,3 +13,5 @@
 
 #define f32 float
 #define f64 double
+
+#define DeltaTime f32

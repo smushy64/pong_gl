@@ -15,12 +15,17 @@ public:
     bool CreateGLContext();
     void GLSwapBuffers();
 
-    ~Window();
+    f64 ElapsedTime();
 
+    ~Window();
 private:
-    HWND m_hWnd;
-    HDC  m_hdc;
-    bool m_success = true;
+    bool      m_success = true;
+
+    HWND      m_hWnd;
+    HDC       m_hdc;
     HINSTANCE m_gl_lib;
-    HGLRC m_hglrc;
+    HGLRC     m_hglrc;
+
+    f64   m_frequency;
+    i64   m_counterStart;
 };

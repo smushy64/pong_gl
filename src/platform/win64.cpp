@@ -2,6 +2,7 @@
 #include "./core/app.hpp"
 #include "opengl.hpp"
 #include <functional>
+#include "glad/glad.h"
 
 #include <iostream>
 
@@ -10,20 +11,33 @@ u64 GetTicks();
 int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
 
     Window window = Window(hInst);
-    if( !window.Success() ) { return -1; }
+    if( !window.Success() ) {
+        std::cout << "FAILED TO CREATE WINDOW!\n";
+        return -1;
+    }
 
     Pong pong = Pong();
     PlayerInput input = {};
 
-    if(!window.CreateGLContext()) { return -1; }
+    if(!window.CreateGLContext()) {
+        std::cout << "FAILED TO CREATE OPENGL CONTEXT!\n";
+        return -1;
+    }
 
     OpenGLRenderer renderer = OpenGLRenderer();
 
+    f32 lastElapsedTime = 0.0;
+
     while(g_RUNNING) {
         window.ProcessMessages(input);
-        pong.Update(1.0f / 60.0f, input);
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);{
+        f32 elapsedTime = window.ElapsedTime();
+        DeltaTime deltaTime   = elapsedTime - lastElapsedTime;
+        lastElapsedTime = elapsedTime;
+
+        pong.Update(deltaTime, input);
+
+        renderer.ClearScreen(); {
             switch(pong.GetAppState()) {
                 case AppState::START: {
                     renderer.RenderMenu(pong.SelectedMenuOption());
@@ -37,6 +51,15 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
 
     return 0;
 
+}
+
+f64 Window::ElapsedTime() {
+    LARGE_INTEGER lpPerformanceCount;
+    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) {
+        g_RUNNING = false;
+        return 0.0;
+    }
+    return double( lpPerformanceCount.QuadPart - m_counterStart )/m_frequency;
 }
 
 void Window::GLSwapBuffers() {
@@ -55,12 +78,13 @@ void Window::ProcessMessages(PlayerInput& input) {
         case WM_KEYDOWN: {
             if( message.wParam == VK_DOWN    || message.wParam == 'S' )  { input.down = true; }
             else if( message.wParam == VK_UP || message.wParam == 'W' ) { input.up = true; }
-            else if( message.wParam == VK_RETURN ) { input.enter = true; }
+            else if( message.wParam == VK_RETURN || message.wParam == VK_SPACE ) { input.enter = true; }
+            else if( message.wParam == VK_ESCAPE ) { g_RUNNING = false; }
         } break;
         case WM_KEYUP: {
             if( message.wParam == VK_DOWN    || message.wParam == 'S' )  { input.down = false; }
             else if( message.wParam == VK_UP || message.wParam == 'W' ) { input.up = false; }
-            else if( message.wParam == VK_RETURN ) { input.enter = false; }
+            else if( message.wParam == VK_RETURN || message.wParam == VK_SPACE ) { input.enter = false; }
         } break;
         default: {
             TranslateMessage(&message);
@@ -115,9 +139,19 @@ Window::Window(HINSTANCE hInst) {
     if(!m_hWnd) { m_success = false; return; }
 
     if( ShowWindow(m_hWnd, SW_SHOWDEFAULT) == FALSE) { m_success = false; return; }
+
+    LARGE_INTEGER lpFrequency;
+    if(QueryPerformanceFrequency(&lpFrequency) == FALSE) { m_success = false; return; }
+
+    m_frequency = double( lpFrequency.QuadPart );
+
+    LARGE_INTEGER lpPerformanceCount;
+    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) { m_success = false; return; }
+
+    m_counterStart = lpPerformanceCount.QuadPart;
 }
 
-typedef HGLRC (*func_wglCreateContextAttribsARB) (HDC, HGLRC, const i32* );
+typedef HGLRC (*wglCreateContextAttribsARBptr) (HDC, HGLRC, const i32* );
 
 const i32 WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
 const i32 WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
@@ -171,8 +205,8 @@ bool Window::CreateGLContext() {
 
     if( wglMakeCurrent(m_hdc, old_gl) == FALSE) { return false; }
 
-    func_wglCreateContextAttribsARB wglCreateContextAttribsARB =
-        (func_wglCreateContextAttribsARB)wglGetProcAddress("wglCreateContextAttribsARB");
+    wglCreateContextAttribsARBptr wglCreateContextAttribsARB =
+        (wglCreateContextAttribsARBptr)wglGetProcAddress("wglCreateContextAttribsARB");
 
     i32 attribs[] = {
         WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
@@ -199,10 +233,4 @@ Window::~Window() {
         wglDeleteContext( m_hglrc );
     }
     ReleaseDC(m_hWnd, m_hdc);
-}
-
-u64 GetTicks() {
-    LARGE_INTEGER result;
-    QueryPerformanceCounter(&result);
-    return result.QuadPart;
 }

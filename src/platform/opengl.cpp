@@ -1,5 +1,6 @@
-#include "globals.hpp"
 #include "opengl.hpp"
+#include "glad/glad.h"
+#include "globals.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -8,7 +9,11 @@
 
 #include <iostream>
 
-const char* FONT = "./resources/Hyperspace Bold.otf";
+const char* FONT = "./resources/HyperspaceBold.otf";
+
+void OpenGLRenderer::ClearScreen() {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
 
 void OpenGLRenderer::RenderGame(const GameState& state) {
 
@@ -42,30 +47,55 @@ void OpenGLRenderer::RenderGame(const GameState& state) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 }
 
-void OpenGLRenderer::RenderMenu(u32 selectedOption) {
+void OpenGLRenderer::RenderMenu(MenuOption selectedOption) {
     glm::vec3 startColor = glm::vec3(0.5f);
     glm::vec3 quitColor  = glm::vec3(0.5f);
     switch(selectedOption) {
-        case START_GAME_OPTION: {
+        case MenuOption::START_GAME: {
             startColor = glm::vec3(1.0f);
         } break;
-        case QUIT_GAME_OPTION: {
+        case MenuOption::QUIT_GAME: {
             quitColor = glm::vec3(1.0f);
         } break;
     }
-    RenderText("PongGL", (SCREEN_W / 2.0f) - 150.0f, (SCREEN_H / 2.0f) + (SCREEN_H / 4.0f), TEXT_SCALE, false, glm::vec3(1.0f));
-    RenderText("Start Game", (SCREEN_W / 2.0f) - 250.0f, SCREEN_H / 2.0f,  TEXT_SCALE * 0.9f, false, startColor);
-    RenderText("Quit  Game", (SCREEN_W / 2.0f) - 250.0f, SCREEN_H / 3.0f, TEXT_SCALE * 0.9f, false, quitColor);
+    RenderText("PongGL",
+        (SCREEN_W / 2.0f) - 150.0f,
+        (SCREEN_H / 2.0f) + (SCREEN_H / 4.0f),
+        TEXT_SCALE,
+        TextStyle::NORMAL,
+        glm::vec3(1.0f)
+    );
+    RenderText("Start Game",
+        (SCREEN_W / 2.0f) - 250.0f,
+        SCREEN_H / 2.0f,
+        TEXT_SCALE * 0.9f,
+        TextStyle::NORMAL,
+        startColor
+    );
+    RenderText("Quit  Game",
+        (SCREEN_W / 2.0f) - 250.0f,
+        SCREEN_H / 3.0f,
+        TEXT_SCALE * 0.9f,
+        TextStyle::NORMAL,
+        quitColor
+    );
+    RenderControls();
+}
+
+void OpenGLRenderer::RenderControls() {
+    RenderText( "Move Cursor [Arrow Up, Arrow Down, W, S] | Confirm [Enter, Space] | Exit [Escape]",
+        10.0f, 10.0f, TEXT_SCALE * 0.2f, TextStyle::NORMAL, glm::vec3(1.0f)
+    );
 }
 
 void OpenGLRenderer::RenderScore(u32 playerScore, u32 cpuScore) {
     f32 textX = 200.0f;
     f32 textY = SCREEN_H - 125.0f;
-    RenderText(std::to_string(playerScore), textX, textY, TEXT_SCALE, false, glm::vec3(1.0f));
-    RenderText(std::to_string(cpuScore), SCREEN_W - textX, textY, TEXT_SCALE, true, glm::vec3(1.0f));
+    RenderText(std::to_string(playerScore), textX, textY, TEXT_SCALE, TextStyle::NORMAL, glm::vec3(1.0f));
+    RenderText(std::to_string(cpuScore), SCREEN_W - textX, textY, TEXT_SCALE, TextStyle::REVERSE, glm::vec3(1.0f));
 }
 
-void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, bool reverse, const glm::vec3& color) {
+void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, TextStyle textStyle, const glm::vec3& color) {
     if(!m_fontLoaded) {
         std::cout << "ERROR: FONT NOT LOADED!" << std::endl;
         return;
@@ -75,26 +105,32 @@ void OpenGLRenderer::RenderText(std::string text, f32 x, f32 y, f32 scale, bool 
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glUniform3fv(m_fontColorLoc, 1, glm::value_ptr(color));
+    if( m_lastFontColor != color ) {
+        glUniform3fv(m_fontColorLoc, 1, glm::value_ptr(color));
+        m_lastFontColor = color;
+    }
 
     glActiveTexture(GL_TEXTURE0);
 
     glBindVertexArray(m_fontVao);
 
-    if(reverse) {
-        std::string::const_reverse_iterator c;
-        for( c = text.rbegin(); c != text.rend(); ++c ) {
-            Character character = m_characters[*c];
-            RenderCharacter(character, x - (character.w + character.bearing_x) * scale, y, scale);
-            x -= (character.advance >> 6) * scale;
-        }
-    } else {
-        std::string::const_iterator c;
-        for( c = text.begin(); c != text.end(); ++c ) {
-            Character character = m_characters[*c];
-            RenderCharacter(character, x, y, scale);
-            x += (character.advance >> 6) * scale;
-        }
+    switch(textStyle) {
+        case TextStyle::NORMAL: {
+            std::string::const_iterator c;
+            for( c = text.begin(); c != text.end(); ++c ) {
+                Character character = m_characters[*c];
+                RenderCharacter(character, x, y, scale);
+                x += (character.advance >> 6) * scale;
+            }
+        } break;
+        case TextStyle::REVERSE: {
+            std::string::const_reverse_iterator c;
+            for( c = text.rbegin(); c != text.rend(); ++c ) {
+                Character character = m_characters[*c];
+                RenderCharacter(character, x - (character.w + character.bearing_x) * scale, y, scale);
+                x -= (character.advance >> 6) * scale;
+            }
+        } break;
     }
 }
 

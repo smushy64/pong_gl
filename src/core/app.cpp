@@ -1,47 +1,50 @@
 #include "app.hpp"
-#include "globals.hpp"
 #include <cmath>
 #include <stdlib.h>
+#include <glm/geometric.hpp>
 
 Pong::Pong() {
     m_state = AppState::START;
     m_gameState = {};
     m_gameState.scored  = true;
-    m_gameState.ball.dx = -1.0f;
+    m_gameState.ball.direction = glm::vec2(-1.0f, 0.0f);
 }
 
-void Pong::Update( Timestep ts, const PlayerInput& input ) {
+void Pong::Update( DeltaTime ts, const PlayerInput& input ) {
     switch(m_state) {
         case AppState::START:{
             if(input.enter) {
                 switch(m_selectedOption) {
-                    case START_GAME_OPTION: {
+                    case MenuOption::START_GAME: {
                         m_state = AppState::GAME;
                     } return;
-                    case QUIT_GAME_OPTION: {
+                    case MenuOption::QUIT_GAME: {
                         g_RUNNING = false;
                     } return;
                 }
             }
             if(input.up != m_lastUp && input.up) {
-                if(m_selectedOption > 0) {
-                    m_selectedOption -= 1;
-                } else {
-                    m_selectedOption = MAX_MENU_OPTIONS - 1;
-                }
+                i32 selectedOption = (i32)m_selectedOption;
+
+                if(selectedOption > 0) { selectedOption -= 1; }
+                else { selectedOption = MAX_MENU_OPTIONS - 1; }
+
+                m_selectedOption = (MenuOption)selectedOption;
             } else if(input.down != m_lastDown && input.down) {
-                m_selectedOption += 1;
-                if(m_selectedOption == MAX_MENU_OPTIONS) {
-                    m_selectedOption = 0;
-                }
+                i32 selectedOption = (i32)m_selectedOption;
+
+                selectedOption += 1;
+                if(selectedOption >= MAX_MENU_OPTIONS) { selectedOption = 0; }
+
+                m_selectedOption = (MenuOption)selectedOption;
             }
             m_lastUp   = input.up;
             m_lastDown = input.down;
         }break;
         case AppState::GAME:{
             if( !m_gameState.scored ) {
-                MoveBallX(m_gameState.ball.dx * ts * BALL_SPEED);
-                MoveBallY(m_gameState.ball.dy * ts * BALL_SPEED);
+                MoveBallX(m_gameState.ball.direction.x * ts * BALL_SPEED);
+                MoveBallY(m_gameState.ball.direction.y * ts * BALL_SPEED);
                 BallCollision();
             } else {
                 m_scoreTimer += ts;
@@ -82,7 +85,7 @@ void Pong::BallCollision() {
     if( bottom <= player_top && top >= player_bottom ) {
         // within player horizontally
         if( left <= player_right && right >= player_left ) {
-            m_gameState.ball.dx = 1.0f;
+            m_gameState.ball.direction.x = 1.0f;
             top_third    = m_gameState.ball.y > m_gameState.player.y + PADDLE_THIRD_H / 2.0f;
             bottom_third = m_gameState.ball.y < m_gameState.player.y - PADDLE_THIRD_H / 2.0f;
             bounce = true;
@@ -92,7 +95,7 @@ void Pong::BallCollision() {
     if( bottom <= cpu_top && top >= cpu_bottom ) {
         // within cpu horizontally
         if( left <= cpu_right && right >= cpu_left ) {
-            m_gameState.ball.dx = -1.0f;
+            m_gameState.ball.direction.x = -1.0f;
             top_third    = m_gameState.ball.y > m_gameState.cpu.y + PADDLE_THIRD_H / 2.0f;
             bottom_third = m_gameState.ball.y < m_gameState.cpu.y - PADDLE_THIRD_H / 2.0f;
             bounce = true;
@@ -102,14 +105,16 @@ void Pong::BallCollision() {
     if(bounce) {
         // ball is in the top third of the paddle
         if(top_third) {
-            m_gameState.ball.dy = BOUNCE_MAX;
+            m_gameState.ball.direction.y = BOUNCE_MAX;
         // ball is in the bottom third of the paddle
         } else if(bottom_third) {
-            m_gameState.ball.dy = -BOUNCE_MAX;
+            m_gameState.ball.direction.y = -BOUNCE_MAX;
         // ball is in the middle of the paddle
         } else {
-            m_gameState.ball.dy = rand() % 2 == 0 ? 0.05f : -0.05f;
+            m_gameState.ball.direction.y = rand() % 2 == 0 ? 0.05f : -0.05f;
         }
+
+        m_gameState.ball.direction = glm::normalize(m_gameState.ball.direction);
     }
 }
 void Pong::MoveBallX(const f32& delta) {
@@ -139,8 +144,8 @@ void Pong::MoveBallX(const f32& delta) {
 void Pong::ResetBall() {
     m_gameState.ball.x  = 0.0f;
     m_gameState.ball.y  = 0.0f;
-    m_gameState.ball.dx = -m_gameState.ball.dx;
-    m_gameState.ball.dy = 0.0f;
+    m_gameState.ball.direction.x = -m_gameState.ball.direction.x;
+    m_gameState.ball.direction.y = 0.0f;
 }
 
 void Pong::MoveBallY(const f32& delta) {
@@ -150,10 +155,10 @@ void Pong::MoveBallY(const f32& delta) {
 
     // collision with ceiling/floor
     if( test_top >= FIELD_H ) {
-        m_gameState.ball.dy = fabs(m_gameState.ball.dy) * -1.0f;
+        m_gameState.ball.direction.y = fabs(m_gameState.ball.direction.y) * -1.0f;
         return;
     } else if( test_bottom <= -FIELD_H ) {
-        m_gameState.ball.dy = fabs(m_gameState.ball.dy);
+        m_gameState.ball.direction.y = fabs(m_gameState.ball.direction.y);
         return;
     }
     

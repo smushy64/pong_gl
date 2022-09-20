@@ -1,7 +1,15 @@
 #pragma once
-#include "define.hpp"
+#include "globals.hpp"
+#include <glm/vec2.hpp>
 
-#define Timestep f32
+const f32 DELAY_BETWEEN_ROUNDS = 1.5f;
+const f32 BALL_SPEED   = 1.25f;
+const f32 PADDLE_SPEED = 1.15f;
+const f32 BALL_HALF_SIZE = BALL_SIZE / 2.0f;
+const f32 PADDLE_THIRD_H = PADDLE_H / 3.0f;
+const f32 PADDLE_HALF_W = PADDLE_W / 2.0f;
+const f32 PADDLE_HALF_H = PADDLE_H / 2.0f;
+const f32 BOUNCE_MAX = 0.6f;
 
 enum AppState {
     START,
@@ -9,7 +17,7 @@ enum AppState {
 };
 
 struct Paddle { f32 y; };
-struct Ball   { f32 x; f32 y; f32 dx; f32 dy; };
+struct Ball   { f32 x; f32 y; glm::vec2 direction; };
 struct GameState {
     Paddle player;
     Paddle cpu;
@@ -25,15 +33,13 @@ struct PlayerInput {
     bool enter;
 };
 
-const f32 DELAY_BETWEEN_ROUNDS = 5.0f;
-
 class Pong {
 public:
     Pong();
-    void Update( Timestep, const PlayerInput& );
+    void Update( DeltaTime, const PlayerInput& );
     const GameState& GetState() { return m_gameState; }
     AppState GetAppState() { return m_state; }
-    u32 SelectedMenuOption() { return m_selectedOption; }
+    MenuOption SelectedMenuOption() { return m_selectedOption; }
 private:
     GameState m_gameState;
     static f32 MovePaddle(const f32&, const f32&);
@@ -44,8 +50,8 @@ private:
     void BallCollision();
     void ResetBall();
 
-    AppState m_state;
-    u32 m_selectedOption = 0;
+    AppState   m_state;
+    MenuOption m_selectedOption = MenuOption::START_GAME;
 
     f32 m_scoreTimer = 0.0f;
     bool m_lastUp   = false;
