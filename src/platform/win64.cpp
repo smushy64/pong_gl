@@ -12,7 +12,7 @@ i64 perfCounterStart;
 
 const char* FONT_PATH = "./resources/HyperspaceBold.otf";
 
-int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, PSTR, int) {
 
     Window window = Window(hInst);
     if( !window.Success() ) {
@@ -33,28 +33,30 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
     ReadResult fontFile = ReadEntireFile(FONT_PATH);
     if(fontFile.contents) {
         // load font
-        Font font = LoadFontFromBytes( fontFile.size, (u8*)fontFile.contents );
+        Font font = LoadFontFromBytes( (u8*)fontFile.contents );
         FreeFileMemory(fontFile.contents);
         // load into renderer
         renderer.LoadFont(font);
         FreeFont(font);
     }
 
-    // while(g_RUNNING) {
-    //     window.ProcessMessages(input);
+#ifdef TEST_FONT
+    while(g_RUNNING) {
+        window.ProcessMessages(input);
 
-    //     renderer.ClearScreen();
-    //     renderer.RenderText(
-    //         "Hello World",
-    //         0.0f,
-    //         SCREEN_H / 2.0f,
-    //         ElapsedTime(),
-    //         TextStyle::NORMAL,
-    //         glm::vec3(1.0f)
-    //     );
-    //     window.GLSwapBuffers();
-    // }
-    // return 0;
+        renderer.ClearScreen();
+        renderer.RenderText(
+            "Hello World",
+            0.0f,
+            SCREEN_H / 2.0f,
+            1.0f,
+            TextStyle::NORMAL,
+            glm::vec3(1.0f)
+        );
+        window.GLSwapBuffers();
+    }
+    return 0;
+#endif
 
     f32 lastElapsedTime = 0.0;
     while(g_RUNNING) {
@@ -194,6 +196,9 @@ const i32 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x00000002;
 const i32 WGL_ERROR_INVALID_VERSION_ARB             = 0x2095;
 const i32 WGL_ERROR_INVALID_PROFILE_ARB             = 0x2096;
 
+// ignore compiler warning
+// casting function pointers from GetProcAddress/wglGetProcAddress is the intended usage
+#pragma GCC diagnostic ignored "-Wcast-function-type"
 void* LoadGL(const char *name) {
     PROC ptr = wglGetProcAddress( name );
     if(!ptr) {

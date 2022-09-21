@@ -14,5 +14,5 @@ struct Font {
     std::map<u8, Glyph> glyphs;
 };
 
-Font LoadFontFromBytes( u32 size, u8* bytes );
+Font LoadFontFromBytes( u8* bytes );
 void FreeFont(Font);

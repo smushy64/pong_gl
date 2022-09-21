@@ -25,7 +25,7 @@ public:
     void RenderControls();
     void RenderGame(const GameState&);
     void LoadFont(const Font&);
-    void RenderText(std::string, f32, f32, f32, TextStyle, const glm::vec3&);
+    void RenderText(std::string text, f32 x, f32 y, f32 scale, TextStyle textStyle, const glm::vec3& color);
     void RenderScore(u32,u32);
     void ClearScreen();
 private:

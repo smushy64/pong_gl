@@ -3,15 +3,15 @@ CC = g++ -std=c++17
 # Change between DEBUG/RELEASE
 # Change target path as well
 # remove -mwindows for debug builds
-CFLAGS    = $(DEBUG)
-LNKFLAGS  = #-mwindows
-TARGETDIR = ./bin/debug
-
-# Dependencies
-# - freetype
+CFLAGS    = $(RELEASE)
+LNKFLAGS  = --static -mwindows
+TARGETDIR = ./bin/release
 
 # Mingw include path
 MINGWINC = C:/msys64/mingw64/include
+
+# defines
+DEF      = -D UNICODE -D WINDOWS
 
 # DONOT EDIT BEYOND THIS POINT!!! ===============================================
 
@@ -25,9 +25,8 @@ RES = ./resources
 DIR = ./src ./src/platform ./src/core
 OBJDIR = /bin/obj
 
-WARN     = -Wall
+WARN     = -Wall -Wextra
 OPT      = -O0 -g
-DEF      = -D UNICODE -D WINDOWS
 DFLAGS   = $(WARN) $(DEF) $(OPT) -D DEBUG
 RFLAGS   = $(DEF) -O2
 DEPFLAGS = -MP -MD

@@ -194,13 +194,22 @@ void OpenGLRenderer::LoadFont(const Font& font) {
 }
 
 #ifdef DEBUG
+
+const i32 IGNORE_IDS_LEN = 1;
+const i32 IGNORE_IDS[] = { 131185 };
+
 void GLMessageCallback(
-    GLuint src, GLenum type,
-    GLint   id, GLenum severity,
-    GLint  len, const GLchar* msg,
-    void* usr_param
+    GLuint, GLenum,
+    GLint id, GLenum,
+    GLint, const GLchar* msg,
+    void*
 ) {
-    std::cout << "OpenGL: " << msg << "\n\n";
+    for( i32 i = 0; i < IGNORE_IDS_LEN; i++ ) {
+        if(id == IGNORE_IDS[i]) {
+            return;
+        }
+    }
+    std::cout << "OpenGL [" << id << "]: " << msg << "\n\n";
 }
 #endif
 

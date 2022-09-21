@@ -4,7 +4,7 @@
 
 const f32 FONT_SIZE = 48.0f;
 
-Font LoadFontFromBytes( u32 size, u8* bytes ) {
+Font LoadFontFromBytes( u8* bytes ) {
     stbtt_fontinfo font;
     stbtt_InitFont(
         &font, bytes,
