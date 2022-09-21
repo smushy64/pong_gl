@@ -1,106 +1,178 @@
-#include "win64.hpp"
+#ifdef WINDOWS
+
+// ignore compiler warning
+// casting function pointers from GetProcAddress/wglGetProcAddress is the intended usage
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+#include <windows.h>
+#include "platform.hpp"
+#include "globals.hpp"
 #include "./core/app.hpp"
-#include "opengl.hpp"
-#include <functional>
-#include "glad/glad.h"
+#include "./core/platform.hpp"
 #include "./core/font.hpp"
+#include "renderer.hpp"
 
 #include <iostream>
 
-f64 perfFrequency;
-i64 perfCounterStart;
-
 const char* FONT_PATH = "./resources/HyperspaceBold.otf";
 
-int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, PSTR, int) {
+#ifdef OPENGL
+HGLRC CreateGLContext();
+void* LoadGL(const char *name);
+#endif
 
-    Window window = Window(hInst);
-    if( !window.Success() ) {
-        std::cout << "FAILED TO CREATE WINDOW!\n";
+bool InitWindow(HINSTANCE hInst);
+FileReadResult ReadEntireFile(const char* filename);
+void ProcessMessages(PlayerInput& input);
+void FreeFileMemory(void* fileMemory);
+f64 ElapsedTime();
+
+HWND g_hWnd;
+HDC  g_hdc;
+f64 g_perfFrequency;
+u64 g_perfCounterStart;
+
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, PSTR, int) {
+    if(!InitWindow(hInst)) {
+        ErrorBox("Failed to create win64 Window!");
         return -1;
     }
+
+#ifdef OPENGL
+    HGLRC hglrc = CreateGLContext();
+    if(!hglrc) {
+        ErrorBox("Failed to create OpenGL context!");
+        return -1;
+    }
+    if(!InitializeGL(LoadGL)) {
+        ErrorBox("Failed to initialize OpenGL!");
+        return -1;
+    }
+#endif
 
     Pong pong = Pong();
     PlayerInput input = {};
 
-    if(!window.CreateGLContext()) {
-        std::cout << "FAILED TO CREATE OPENGL CONTEXT!\n";
+    if( !InitializeRenderer() ) {
+        ErrorBox("Failed to initialize renderer!");
         return -1;
     }
 
-    OpenGLRenderer renderer = OpenGLRenderer();
-
-    ReadResult fontFile = ReadEntireFile(FONT_PATH);
+    FileReadResult fontFile = ReadEntireFile(FONT_PATH);
     if(fontFile.contents) {
-        // load font
         Font font = LoadFontFromBytes( (u8*)fontFile.contents );
         FreeFileMemory(fontFile.contents);
         // load into renderer
-        renderer.LoadFont(font);
+        RendererLoadFont(font);
         FreeFont(font);
+    } else {
+        ErrorBox("Failed to load font!\nPerhaps the resources folder is not in the same directory as this program?");
+        return -1;
     }
-
-#ifdef TEST_FONT
-    while(g_RUNNING) {
-        window.ProcessMessages(input);
-
-        renderer.ClearScreen();
-        renderer.RenderText(
-            "Hello World",
-            0.0f,
-            SCREEN_H / 2.0f,
-            1.0f,
-            TextStyle::NORMAL,
-            glm::vec3(1.0f)
-        );
-        window.GLSwapBuffers();
-    }
-    return 0;
-#endif
 
     f32 lastElapsedTime = 0.0;
     while(g_RUNNING) {
-        window.ProcessMessages(input);
-
+        ProcessMessages(input);
         f32 elapsedTime     = ElapsedTime();
         DeltaTime deltaTime = elapsedTime - lastElapsedTime;
         lastElapsedTime     = elapsedTime;
 
-        pong.Update(deltaTime, input);
+        switch(pong.CurrentScene()) {
+            case Scene::MAIN_MENU: {
+                pong.UpdateMenu(input);
+            } break;
+            case Scene::IN_GAME: {
+                pong.UpdateGame(deltaTime, input);
+            } break;
+        }
 
-        renderer.ClearScreen(); {
-            switch(pong.GetAppState()) {
-                case AppState::START: {
-                    renderer.RenderMenu(pong.SelectedMenuOption());
-                } break;
-                case AppState::GAME: {
-                    renderer.RenderGame(pong.GetState());
-                } break;
-            }
-        } window.GLSwapBuffers();
+        ClearScreen();
+        switch(pong.CurrentScene()) {
+            case Scene::MAIN_MENU: {
+                RenderMenu(pong.GetSelectedMenuOption());
+            } break;
+            case Scene::IN_GAME: {
+                RenderGame(pong.GetGameState());
+            } break;
+        }
+
+#ifdef OPENGL
+    SwapBuffers(g_hdc);
+#endif
     }
 
+#ifdef OPENGL
+    wglMakeCurrent(nullptr, nullptr);
+    if(hglrc) {
+        wglDeleteContext( hglrc );
+    }
+#endif
+    ReleaseDC(g_hWnd, g_hdc);
     return 0;
-
 }
 
-f64 ElapsedTime() {
-    LARGE_INTEGER lpPerformanceCount;
-    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) {
-        g_RUNNING = false;
-        return 0.0;
+LRESULT MainWindowCallback( HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam ) {
+    switch(Msg) {
+        case WM_CLOSE: {
+            g_RUNNING = false;
+        } return TRUE;
+
+        default: {
+        }return DefWindowProc( hWnd, Msg, wParam, lParam );
     }
-    return double( lpPerformanceCount.QuadPart - perfCounterStart )/perfFrequency;
 }
 
-void Window::GLSwapBuffers() {
-    SwapBuffers(m_hdc);
+bool InitWindow(HINSTANCE hInst) {
+    WNDCLASSEXW windowClass   = {};
+    windowClass.cbSize        = sizeof(WNDCLASSEXW);
+    windowClass.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+    windowClass.hInstance     = hInst;
+    windowClass.lpfnWndProc   = MainWindowCallback;
+    windowClass.lpszClassName = L"WindowClass";
+    windowClass.hCursor       = LoadCursor( nullptr, IDC_ARROW );
+
+    if( RegisterClassEx(&windowClass) == FALSE ) { return false; }
+
+    RECT windowRect   = {};
+    windowRect.left   = 0;
+    windowRect.top    = 0;
+    windowRect.right  = 1280;
+    windowRect.bottom = 720;
+
+    if( AdjustWindowRectEx(
+        &windowRect, WS_OVERLAPPEDWINDOW, 0, 0
+    ) == FALSE ) { return false; }
+
+    g_hWnd = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        windowClass.lpszClassName,
+        L"PongGL",
+        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        windowRect.right  - windowRect.left,
+        windowRect.bottom - windowRect.top,
+        0, 0, hInst, 0
+    );
+
+    if(!g_hWnd) { return false; }
+    if( ShowWindow(g_hWnd, SW_SHOWDEFAULT) == FALSE) { return false; }
+
+    LARGE_INTEGER lpFrequency;
+    if(QueryPerformanceFrequency(&lpFrequency) == FALSE) { return false; }
+
+    g_perfFrequency = f64( lpFrequency.QuadPart );
+
+    LARGE_INTEGER lpPerformanceCount;
+    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) { return false; }
+
+    g_perfCounterStart = lpPerformanceCount.QuadPart;
+
+    return true;
 }
 
-void Window::ProcessMessages(PlayerInput& input) {
+void ProcessMessages(PlayerInput& input) {
     MSG message = {};
     if( PeekMessage(
-        &message, m_hWnd,
+        &message, g_hWnd,
         0, 0,
         PM_REMOVE
     ) == FALSE) { return; }
@@ -124,81 +196,17 @@ void Window::ProcessMessages(PlayerInput& input) {
     }
 }
 
-LRESULT MainWindowCallback( HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam ) {
-    switch(Msg) {
-        case WM_CLOSE: {
-            g_RUNNING = false;
-        } return TRUE;
-
-        default: {
-        }return DefWindowProc( hWnd, Msg, wParam, lParam );
-    }
-}
-
-Window::Window(HINSTANCE hInst) {
-    WNDCLASSEXW window_class   = {};
-    window_class.cbSize        = sizeof(WNDCLASSEXW);
-    window_class.style         = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    window_class.hInstance     = hInst;
-    window_class.lpfnWndProc   = MainWindowCallback;
-    window_class.lpszClassName = L"WindowClass";
-    window_class.hCursor       = LoadCursor( nullptr, IDC_ARROW );
-
-    if( RegisterClassEx( &window_class ) == FALSE ) { m_success = false; return; }
-
-    RECT window_rect   = {};
-    window_rect.left   = 0;
-    window_rect.top    = 0;
-    window_rect.right  = 1280;
-    window_rect.bottom = 720;
-
-    if( AdjustWindowRectEx(
-        &window_rect, WS_OVERLAPPEDWINDOW, 0, 0
-    ) == FALSE ) { m_success = false; return; }
-
-    m_hWnd = CreateWindowEx(
-        WS_EX_CLIENTEDGE,
-        window_class.lpszClassName,
-        L"PongGL",
-        WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        window_rect.right  - window_rect.left,
-        window_rect.bottom - window_rect.top,
-        0, 0, hInst, 0
-    );
-
-    if(!m_hWnd) { m_success = false; return; }
-
-    if( ShowWindow(m_hWnd, SW_SHOWDEFAULT) == FALSE) { m_success = false; return; }
-
-    LARGE_INTEGER lpFrequency;
-    if(QueryPerformanceFrequency(&lpFrequency) == FALSE) { m_success = false; return; }
-
-    perfFrequency = double( lpFrequency.QuadPart );
-
-    LARGE_INTEGER lpPerformanceCount;
-    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) { m_success = false; return; }
-
-    perfCounterStart = lpPerformanceCount.QuadPart;
-}
+#ifdef OPENGL
 
 typedef HGLRC (*wglCreateContextAttribsARBptr) (HDC, HGLRC, const i32* );
 
 const i32 WGL_CONTEXT_MAJOR_VERSION_ARB             = 0x2091;
 const i32 WGL_CONTEXT_MINOR_VERSION_ARB             = 0x2092;
-const i32 WGL_CONTEXT_LAYER_PLANE_ARB               = 0x2093;
 const i32 WGL_CONTEXT_FLAGS_ARB                     = 0x2094;
 const i32 WGL_CONTEXT_PROFILE_MASK_ARB              = 0x9126;
-const i32 WGL_CONTEXT_DEBUG_BIT_ARB                 = 0x0001;
 const i32 WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB    = 0x0002;
 const i32 WGL_CONTEXT_CORE_PROFILE_BIT_ARB          = 0x00000001;
-const i32 WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB = 0x00000002;
-const i32 WGL_ERROR_INVALID_VERSION_ARB             = 0x2095;
-const i32 WGL_ERROR_INVALID_PROFILE_ARB             = 0x2096;
 
-// ignore compiler warning
-// casting function pointers from GetProcAddress/wglGetProcAddress is the intended usage
-#pragma GCC diagnostic ignored "-Wcast-function-type"
 void* LoadGL(const char *name) {
     PROC ptr = wglGetProcAddress( name );
     if(!ptr) {
@@ -209,9 +217,9 @@ void* LoadGL(const char *name) {
     return (void*)ptr;
 }
 
-bool Window::CreateGLContext() {
-    m_hdc = GetDC(m_hWnd);
-    if( !m_hdc ) { return false; }
+HGLRC CreateGLContext() {
+    g_hdc = GetDC(g_hWnd);
+    if( !g_hdc ) { return nullptr; }
 
     PIXELFORMATDESCRIPTOR desiredPixelFormat = {};
     u16 pixelFormatSize = sizeof( PIXELFORMATDESCRIPTOR );
@@ -223,21 +231,21 @@ bool Window::CreateGLContext() {
     desiredPixelFormat.cAlphaBits = 8;
     desiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
 
-    i32 pixelFormatIndex = ChoosePixelFormat( m_hdc, &desiredPixelFormat );
+    i32 pixelFormatIndex = ChoosePixelFormat( g_hdc, &desiredPixelFormat );
     PIXELFORMATDESCRIPTOR suggestedPixelFormat = {};
     DescribePixelFormat(
-        m_hdc, pixelFormatIndex,
+        g_hdc, pixelFormatIndex,
         pixelFormatSize, &suggestedPixelFormat
     );
 
-    if( SetPixelFormat(m_hdc, pixelFormatIndex, &suggestedPixelFormat) == FALSE ) {
-        return false;
+    if( SetPixelFormat(g_hdc, pixelFormatIndex, &suggestedPixelFormat) == FALSE ) {
+        return nullptr;
     }
 
-    HGLRC old_gl = wglCreateContext(m_hdc);
-    if(!old_gl) { return false; }
+    HGLRC old_gl = wglCreateContext(g_hdc);
+    if(!old_gl) { return nullptr; }
 
-    if( wglMakeCurrent(m_hdc, old_gl) == FALSE) { return false; }
+    if( wglMakeCurrent(g_hdc, old_gl) == FALSE) { return nullptr; }
 
     wglCreateContextAttribsARBptr wglCreateContextAttribsARB =
         (wglCreateContextAttribsARBptr)wglGetProcAddress("wglCreateContextAttribsARB");
@@ -250,28 +258,20 @@ bool Window::CreateGLContext() {
         0
     };
 
-    m_hglrc = wglCreateContextAttribsARB( m_hdc, nullptr, attribs );
+    HGLRC hglrc = wglCreateContextAttribsARB( g_hdc, nullptr, attribs );
 
     wglDeleteContext(old_gl);
-    wglMakeCurrent(m_hdc, m_hglrc);
+    wglMakeCurrent(g_hdc, hglrc);
 
-    if(!gladLoadGLLoader((GLADloadproc)LoadGL)) { return false; }
-
-    return true;
+    return hglrc;
 
 }
 
-Window::~Window() {
-    wglMakeCurrent(nullptr, nullptr);
-    if(m_hglrc) {
-        wglDeleteContext( m_hglrc );
-    }
-    ReleaseDC(m_hWnd, m_hdc);
-}
+#endif
 
-ReadResult ReadEntireFile(const char* filename) {
+FileReadResult ReadEntireFile(const char* filename) {
 
-    ReadResult result = {};
+    FileReadResult result = {};
     result.contents = nullptr;
     result.size     = 0;
 
@@ -309,6 +309,26 @@ ReadResult ReadEntireFile(const char* filename) {
     return result;
 }
 
-void FreeFileMemory(void* fileMemory) {
-    VirtualFree( fileMemory, 0, MEM_RELEASE );
+void ErrorBox(std::string errorMessage) {
+    std::wstring stemp = std::wstring(errorMessage.begin(), errorMessage.end());
+    LPCWSTR sw = stemp.c_str();
+    MessageBox(
+        nullptr,
+        sw,
+        L"Fatal Error",
+        MB_OK
+    );
 }
+
+void FreeFileMemory(void* fileMemory) { VirtualFree( fileMemory, 0, MEM_RELEASE ); }
+
+f64 ElapsedTime() {
+    LARGE_INTEGER lpPerformanceCount;
+    if(QueryPerformanceCounter(&lpPerformanceCount) == FALSE) {
+        g_RUNNING = false;
+        return 0.0;
+    }
+    return double( lpPerformanceCount.QuadPart - g_perfCounterStart )/g_perfFrequency;
+}
+
+#endif

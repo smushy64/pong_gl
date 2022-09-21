@@ -3,12 +3,6 @@
 
 inline bool g_RUNNING = true;
 
-const i32 MAX_MENU_OPTIONS  = 2;
-enum MenuOption {
-    START_GAME = 0,
-    QUIT_GAME,
-};
-
 const f32 TEXT_SCALE = 2.0f;
 const f32 BALL_SIZE  = 0.05f;
 

@@ -3,62 +3,68 @@
 #include <stdlib.h>
 #include <glm/geometric.hpp>
 
+const f32 DELAY_BETWEEN_ROUNDS = 1.5f;
+const f32 BALL_SPEED   = 1.25f;
+const f32 PADDLE_SPEED = 1.15f;
+const f32 BALL_HALF_SIZE = BALL_SIZE / 2.0f;
+const f32 PADDLE_THIRD_H = PADDLE_H / 3.0f;
+const f32 PADDLE_HALF_W = PADDLE_W / 2.0f;
+const f32 PADDLE_HALF_H = PADDLE_H / 2.0f;
+const f32 BOUNCE_MAX = 0.6f;
+
 Pong::Pong() {
-    m_state = AppState::START;
+    m_currentScene = Scene::MAIN_MENU;
     m_gameState = {};
     m_gameState.scored  = true;
     m_gameState.ball.direction = glm::vec2(-1.0f, 0.0f);
 }
 
-void Pong::Update( DeltaTime ts, const PlayerInput& input ) {
-    switch(m_state) {
-        case AppState::START:{
-            if(input.enter) {
-                switch(m_selectedOption) {
-                    case MenuOption::START_GAME: {
-                        m_state = AppState::GAME;
-                    } return;
-                    case MenuOption::QUIT_GAME: {
-                        g_RUNNING = false;
-                    } return;
-                }
-            }
-            if(input.up != m_lastUp && input.up) {
-                i32 selectedOption = (i32)m_selectedOption;
-
-                if(selectedOption > 0) { selectedOption -= 1; }
-                else { selectedOption = MAX_MENU_OPTIONS - 1; }
-
-                m_selectedOption = (MenuOption)selectedOption;
-            } else if(input.down != m_lastDown && input.down) {
-                i32 selectedOption = (i32)m_selectedOption;
-
-                selectedOption += 1;
-                if(selectedOption >= MAX_MENU_OPTIONS) { selectedOption = 0; }
-
-                m_selectedOption = (MenuOption)selectedOption;
-            }
-            m_lastUp   = input.up;
-            m_lastDown = input.down;
-        }break;
-        case AppState::GAME:{
-            if( !m_gameState.scored ) {
-                MoveBallX(m_gameState.ball.direction.x * ts * BALL_SPEED);
-                MoveBallY(m_gameState.ball.direction.y * ts * BALL_SPEED);
-                BallCollision();
-            } else {
-                m_scoreTimer += ts;
-                if(m_scoreTimer >= DELAY_BETWEEN_ROUNDS) {
-                    m_scoreTimer = 0.0f;
-                    m_gameState.scored = false;
-                    ResetBall();
-                }
-            }
-
-            m_gameState.player.y = MovePaddle( m_gameState.player.y, PADDLE_SPEED * PlayerDY(input) * ts );
-            m_gameState.cpu.y    = MovePaddle( m_gameState.cpu.y,    CpuDY() * ts );
-        }break;
+void Pong::UpdateMenu(const PlayerInput& input) {
+    if(input.enter) {
+        switch(m_selectedMenuOption) {
+            case MenuOption::START_GAME: {
+                m_currentScene = Scene::IN_GAME;
+            } return;
+            case MenuOption::QUIT_GAME: {
+                g_RUNNING = false;
+            } return;
+        }
     }
+    if(input.up != m_lastUp && input.up) {
+        i32 selectedOption = (i32)m_selectedMenuOption;
+
+        if(selectedOption > 0) { selectedOption -= 1; }
+        else { selectedOption = MAX_MENU_OPTIONS - 1; }
+
+        m_selectedMenuOption = (MenuOption)selectedOption;
+    } else if(input.down != m_lastDown && input.down) {
+        i32 selectedOption = (i32)m_selectedMenuOption;
+
+        selectedOption += 1;
+        if(selectedOption >= MAX_MENU_OPTIONS) { selectedOption = 0; }
+
+        m_selectedMenuOption = (MenuOption)selectedOption;
+    }
+    m_lastUp   = input.up;
+    m_lastDown = input.down;
+}
+
+void Pong::UpdateGame( DeltaTime ts, const PlayerInput& input ) {
+    if( !m_gameState.scored ) {
+        MoveBallX(m_gameState.ball.direction.x * ts * BALL_SPEED);
+        MoveBallY(m_gameState.ball.direction.y * ts * BALL_SPEED);
+        BallCollision();
+    } else {
+        m_scoreTimer += ts;
+        if(m_scoreTimer >= DELAY_BETWEEN_ROUNDS) {
+            m_scoreTimer = 0.0f;
+            m_gameState.scored = false;
+            ResetBall();
+        }
+    }
+
+    m_gameState.player.y = MovePaddle( m_gameState.player.y, PADDLE_SPEED * PlayerDY(input) * ts );
+    m_gameState.cpu.y    = MovePaddle( m_gameState.cpu.y,    CpuDY() * ts );
 }
 
 void Pong::BallCollision() {
@@ -193,3 +199,50 @@ f32 Pong::CpuDY() {
         return -PADDLE_SPEED;
     } else { return 0.0f; }
 }
+
+UITextElement TITLE_ELEMENT = UITextElement(
+    "PongGL",
+    (SCREEN_W / 2.0f) - 150.0f,
+    (SCREEN_H / 2.0f) + (SCREEN_H / 4.0f),
+    TEXT_SCALE
+);
+UITextElement START_GAME_ELEMENT = UITextElement(
+    "Start Game",
+    (SCREEN_W / 2.0f) - 250.0f,
+    (SCREEN_H / 2.0f),
+    TEXT_SCALE * 0.9f
+);
+UITextElement QUIT_GAME_ELEMENT = UITextElement(
+    "Quit  Game",
+    (SCREEN_W / 2.0f) - 250.0f,
+    SCREEN_H / 3.0f,
+    TEXT_SCALE * 0.9f
+);
+
+const f32 CONTROLS_ELEMENT_VERTICAL_SPACING = 30.0f;
+const f32 CONTROLS_ELEMENT_SCALE = 0.3f;
+UITextElement CONTROLS0_ELEMENT = UITextElement(
+    "Move Cursor [ Arrow Up | Arrow Down | W | S ]",
+    10.0f,
+    SCREEN_H - ( 10.0f + (CONTROLS_ELEMENT_VERTICAL_SPACING * 2.0f) ),
+    TEXT_SCALE * CONTROLS_ELEMENT_SCALE
+);
+UITextElement CONTROLS1_ELEMENT = UITextElement(
+    "Confirm     [ Enter | Space ]",
+    10.0f,
+    SCREEN_H - ( 10.0f + CONTROLS_ELEMENT_VERTICAL_SPACING ),
+    TEXT_SCALE * CONTROLS_ELEMENT_SCALE
+);
+UITextElement CONTROLS2_ELEMENT = UITextElement(
+    "Exit        [ Escape ]",
+    10.0f,
+    SCREEN_H - 10.0f,
+    TEXT_SCALE * CONTROLS_ELEMENT_SCALE
+);
+
+const UITextElement& GetTitleText() { return TITLE_ELEMENT; }
+UITextElement& GetStartGameText() { return START_GAME_ELEMENT; }
+UITextElement& GetQuitGameText() { return QUIT_GAME_ELEMENT; }
+const UITextElement& GetControlsText0() { return CONTROLS0_ELEMENT; }
+const UITextElement& GetControlsText1() { return CONTROLS1_ELEMENT; }
+const UITextElement& GetControlsText2() { return CONTROLS2_ELEMENT; }

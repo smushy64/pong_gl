@@ -11,7 +11,7 @@ TARGETDIR = ./bin/release
 MINGWINC = C:/msys64/mingw64/include
 
 # defines
-DEF      = -D UNICODE -D WINDOWS
+DEF      = -D UNICODE -D WINDOWS -D OPENGL
 
 # DONOT EDIT BEYOND THIS POINT!!! ===============================================
 

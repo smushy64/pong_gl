@@ -1,10 +1,12 @@
 ## TODO
 
-- [x] Manual font loading
+- [x] Rewrite Platform Layer
+- [x] Rewrite Renderer Layer
+- [ ] Rewrite Text Rendering
 - [ ] Program icon
 - [ ] OpenAL sound
-- [ ] Pause menu
 - [ ] Make text rendering better (it sucks right now)
+- [x] Manual font loading
 - [x] Main Menu
 - [x] Escape quits game
 - [x] Present Controls in menus
